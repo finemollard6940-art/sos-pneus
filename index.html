@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>SOS Pneus 69 — Gestion Stock & Gardiennage</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --red: #D42020; --red-dark: #A01515; --red-light: #fdf0f0;
+      --black: #111111; --gray-mid: #666; --gray-light: #f5f5f3;
+      --white: #ffffff; --border: 1px solid #e8e8e5;
+      --radius: 12px; --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    body { font-family: 'Barlow', sans-serif; background: var(--gray-light); color: var(--black); min-height: 100vh; }
+
+    /* ══ LOGIN ══ */
+    #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--black); padding:1.5rem; }
+    #login-screen.hidden { display:none; }
+    .login-card { background:var(--white); border-radius:20px; padding:40px 32px; width:100%; max-width:380px; box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+    .login-logo { text-align:center; margin-bottom:24px; }
+    .login-logo img { height:68px; object-fit:contain; }
+    .login-title { font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:900; text-align:center; margin-bottom:4px; }
+    .login-sub { text-align:center; font-size:13px; color:var(--gray-mid); margin-bottom:26px; }
+    .login-label { display:block; font-size:12px; font-weight:600; color:var(--gray-mid); text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; margin-top:14px; }
+    .login-input { width:100%; padding:13px 16px; border:1.5px solid #ddd; border-radius:10px; font-family:'Barlow',sans-serif; font-size:15px; outline:none; transition:border-color .2s; color:var(--black); }
+    .login-input:focus { border-color:var(--red); }
+    .login-btn { width:100%; margin-top:22px; padding:14px; background:var(--red); color:white; border:none; border-radius:10px; font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:700; cursor:pointer; transition:background .2s; }
+    .login-btn:hover { background:var(--red-dark); }
+    .login-btn:disabled { background:#ccc; cursor:default; }
+    .login-error { margin-top:12px; padding:10px 14px; background:#fde8e8; border:1px solid #f5c6c6; border-radius:8px; font-size:13px; color:var(--red-dark); display:none; }
+
+    /* ══ APP ══ */
+    #app-screen { display:none; }
+    #app-screen.visible { display:block; }
+
+    /* ── Header ── */
+    .site-header { background:var(--black); padding:0 1rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; height:62px; position:sticky; top:0; z-index:100; box-shadow:0 2px 20px rgba(0,0,0,.4); }
+    .header-logo { display:flex; align-items:center; gap:10px; }
+    .logo-img { height:46px; width:auto; object-fit:contain; }
+    .header-title { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:16px; color:var(--white); line-height:1.2; }
+    .header-title span { color:var(--red); }
+    .header-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+    .header-status { display:flex; align-items:center; gap:5px; font-size:11px; color:#aaa; }
+    .status-dot { width:7px; height:7px; border-radius:50%; background:#4caf50; animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+    .btn-logout { padding:7px 12px; background:rgba(255,255,255,.1); color:#ddd; border:1px solid rgba(255,255,255,.15); border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; white-space:nowrap; }
+    .btn-logout:hover { background:rgba(255,255,255,.2); color:white; }
+
+    /* ── Main tabs ── */
+    .main-tabs { background:var(--white); border-bottom:var(--border); display:flex; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+    .main-tabs::-webkit-scrollbar { display:none; }
+    .main-tab-btn { flex-shrink:0; padding:14px 20px; font-family:'Barlow',sans-serif; font-weight:600; font-size:14px; border:none; background:none; cursor:pointer; color:var(--gray-mid); border-bottom:3px solid transparent; margin-bottom:-1px; transition:color .2s,border-color .2s; white-space:nowrap; }
+    .main-tab-btn.active { color:var(--red); border-bottom-color:var(--red); }
+    .main-tab-btn:hover:not(.active) { color:var(--black); }
+
+    .tab-panel { display:none; padding:1rem; max-width:1100px; margin:0 auto; }
+    .tab-panel.active { display:block; }
+
+    /* ── Stats ── */
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:1.1rem; }
+    .stat-card { background:var(--white); border:var(--border); border-radius:var(--radius); padding:12px 8px; text-align:center; }
+    .stat-num { font-family:'Barlow Condensed',sans-serif; font-size:30px; font-weight:900; color:var(--red); line-height:1; }
+    .stat-label { font-size:11px; color:var(--gray-mid); margin-top:3px; }
+
+    /* ── Toolbar ── */
+    .toolbar { display:flex; gap:8px; margin-bottom:.9rem; flex-wrap:wrap; }
+    .search-input { flex:1; min-width:160px; padding:11px 14px; border:var(--border); border-radius:var(--radius); font-family:'Barlow',sans-serif; font-size:15px; background:var(--white); color:var(--black); outline:none; transition:border-color .2s; }
+    .search-input:focus { border-color:var(--red); }
+    .btn { padding:11px 18px; border-radius:var(--radius); font-family:'Barlow',sans-serif; font-weight:600; font-size:14px; cursor:pointer; border:none; transition:all .18s; white-space:nowrap; touch-action:manipulation; }
+    .btn-primary { background:var(--red); color:white; }
+    .btn-primary:hover { background:var(--red-dark); }
+    .btn-primary:active { transform:scale(.97); }
+    .btn-secondary { background:var(--white); color:var(--black); border:var(--border); }
+    .btn-secondary:hover { background:var(--gray-light); }
+    .btn-danger { background:#fff0f0; color:var(--red); border:1px solid #f5c6c6; }
+    .btn-danger:hover { background:#fde0e0; }
+    .btn-sm { padding:8px 12px; font-size:13px; border-radius:8px; }
+
+    /* ── Inch filter ── */
+    .inch-tabs { display:flex; gap:6px; margin-bottom:.9rem; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; scrollbar-width:none; }
+    .inch-tabs::-webkit-scrollbar { display:none; }
+    .inch-tab { flex-shrink:0; padding:8px 14px; border-radius:20px; border:1.5px solid #ddd; background:var(--white); font-family:'Barlow',sans-serif; font-weight:600; font-size:13px; cursor:pointer; color:var(--gray-mid); transition:all .18s; touch-action:manipulation; }
+    .inch-tab.active { background:var(--red); border-color:var(--red); color:white; }
+    .inch-tab:hover:not(.active) { border-color:var(--red); color:var(--red); }
+
+    /* ── Stock cards ── */
+    .stock-cards { display:flex; flex-direction:column; gap:8px; }
+    .stock-card { background:var(--white); border:var(--border); border-radius:var(--radius); padding:12px 14px; display:flex; align-items:center; gap:12px; box-shadow:var(--shadow); }
+    .stock-card-info { flex:1; min-width:0; }
+    .stock-card-taille { font-family:'Barlow Condensed',sans-serif; font-size:20px; font-weight:900; color:var(--black); line-height:1; }
+    .stock-card-meta { font-size:13px; color:var(--gray-mid); margin-top:3px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .stock-card-right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+
+    /* ── Qty control ── */
+    .qty-ctrl { display:flex; align-items:center; gap:5px; }
+    .qty-btn { width:38px; height:38px; border-radius:8px; border:var(--border); background:var(--white); cursor:pointer; font-size:20px; font-weight:700; display:flex; align-items:center; justify-content:center; transition:all .15s; color:var(--black); touch-action:manipulation; line-height:1; user-select:none; }
+    .qty-btn:hover,.qty-btn:active { background:var(--red-light); border-color:var(--red); color:var(--red); }
+    .qty-num { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:22px; min-width:32px; text-align:center; }
+    .qty-num.zero { color:#ccc; }
+    .stock-actions { display:flex; gap:5px; }
+
+    /* ── Badges ── */
+    .badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+    .badge-neuf { background:#e8f5e9; color:#2e7d32; }
+    .badge-occ { background:#fff3e0; color:#e65100; }
+    .badge-rdc { background:#e3f2fd; color:#1565c0; }
+    .badge-etage { background:#f3e5f5; color:#6a1b9a; }
+
+    /* ── Table ── */
+    .table-wrap { background:var(--white); border:var(--border); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); }
+    table { width:100%; border-collapse:collapse; }
+    thead { background:var(--black); }
+    thead th { padding:11px 14px; text-align:left; font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; color:#bbb; letter-spacing:.5px; text-transform:uppercase; }
+    tbody tr { border-bottom:var(--border); transition:background .12s; }
+    tbody tr:last-child { border-bottom:none; }
+    tbody tr:hover { background:#fafafa; }
+    tbody td { padding:12px 14px; font-size:14px; color:var(--black); vertical-align:middle; }
+    .actions-cell { display:flex; gap:5px; }
+
+    /* ── Modal ── */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:flex-end; justify-content:center; z-index:999; }
+    .modal-overlay.hidden { display:none; }
+    .modal-box { background:var(--white); border-radius:20px 20px 0 0; padding:20px 20px 32px; width:100%; max-width:520px; max-height:92vh; overflow-y:auto; animation:slideUp .25s ease; }
+    @keyframes slideUp { from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1} }
+    .modal-handle { width:40px; height:4px; background:#ddd; border-radius:2px; margin:0 auto 16px; }
+    .modal-title { font-family:'Barlow Condensed',sans-serif; font-size:22px; font-weight:900; margin-bottom:16px; border-bottom:2px solid var(--red); padding-bottom:10px; }
+    .form-group { margin-bottom:12px; }
+    .form-label { display:block; font-size:12px; font-weight:600; color:var(--gray-mid); margin-bottom:5px; text-transform:uppercase; letter-spacing:.3px; }
+    .form-control { width:100%; padding:12px 14px; border:var(--border); border-radius:10px; font-family:'Barlow',sans-serif; font-size:16px; color:var(--black); background:var(--white); outline:none; transition:border-color .2s; -webkit-appearance:none; }
+    .form-control:focus { border-color:var(--red); }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .modal-actions { display:flex; gap:10px; margin-top:18px; }
+    .modal-actions .btn { flex:1; padding:14px; font-size:15px; }
+
+    /* ── Empty / Loading ── */
+    .empty-state { text-align:center; padding:3rem 1rem; color:#bbb; }
+    .empty-icon { font-size:44px; margin-bottom:10px; }
+    .empty-text { font-size:15px; }
+    .loading { display:flex; align-items:center; justify-content:center; gap:10px; padding:2rem; color:var(--gray-mid); font-size:14px; }
+    .spinner { width:20px; height:20px; border:2px solid #ddd; border-top-color:var(--red); border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    .date-past { color:var(--red); font-weight:700; }
+    .date-soon { color:#e65100; font-weight:600; }
+
+    /* ── Toast ── */
+    .toast-container { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none; }
+    .toast { background:var(--black); color:white; padding:11px 22px; border-radius:50px; font-size:14px; font-weight:600; animation:toastIn .3s ease; box-shadow:0 4px 20px rgba(0,0,0,.25); white-space:nowrap; }
+    .toast.success { background:#1b5e20; }
+    .toast.error { background:#b71c1c; }
+    @keyframes toastIn { from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1} }
+
+    /* ── Responsive ── */
+    @media(min-width:641px){ .modal-overlay{align-items:center;padding:1rem;} .modal-box{border-radius:20px;max-height:88vh;} }
+    @media(max-width:640px){ .stats-row{grid-template-columns:repeat(2,1fr);} .header-title{display:none;} thead th:nth-child(n+5){display:none;} tbody td:nth-child(n+5){display:none;} }
+  </style>
+</head>
+<body>
+
+<!-- ══ ÉCRAN LOGIN ══ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTU0_NMgC4pZ_zLeu4nrp1twl74gbrwIO7Fzg&s" alt="SOS Pneus 69" onerror="this.style.display='none'" />
+    </div>
+    <div class="login-title">SOS Pneus 69</div>
+    <div class="login-sub">Accès réservé aux employés</div>
+    <label class="login-label">Email</label>
+    <input class="login-input" type="email" id="login-email" placeholder="employe@sospneus69.fr" autocomplete="email" />
+    <label class="login-label">Mot de passe</label>
+    <input class="login-input" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+    <div class="login-error" id="login-error"></div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Se connecter</button>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app-screen">
+
+  <header class="site-header">
+    <div class="header-logo">
+      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTU0_NMgC4pZ_zLeu4nrp1twl74gbrwIO7Fzg&s" alt="SOS Pneus 69" class="logo-img" onerror="this.style.display='none'" />
+      <div class="header-title">Gestion Stock<br><span>SOS Pneus 69</span></div>
+    </div>
+    <div class="header-right">
+      <div class="header-status">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Connecté</span>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+    </div>
+  </header>
+
+  <nav class="main-tabs">
+    <button class="main-tab-btn active" onclick="switchTab('stock')">🛞 Stock Pneus</button>
+    <button class="main-tab-btn" onclick="switchTab('gardiennage')">📦 Gardiennage</button>
+  </nav>
+
+  <!-- STOCK -->
+  <div class="tab-panel active" id="panel-stock">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-num" id="s-stat-refs">—</div><div class="stat-label">Références</div></div>
+      <div class="stat-card"><div class="stat-num" id="s-stat-total">—</div><div class="stat-label">Total pneus</div></div>
+      <div class="stat-card"><div class="stat-num" id="s-stat-neuf">—</div><div class="stat-label">Neufs</div></div>
+      <div class="stat-card"><div class="stat-num" id="s-stat-occ">—</div><div class="stat-label">Occasions</div></div>
+    </div>
+    <div class="toolbar">
+      <input type="text" class="search-input" id="stock-search" placeholder="🔍 Taille ou marque..." oninput="renderStock()" />
+      <button class="btn btn-primary" onclick="openStockModal()">+ Ajouter</button>
+    </div>
+    <div class="inch-tabs" id="inch-tabs">
+      <button class="inch-tab active" onclick="setInchFilter(this,'tous')">Tous</button>
+      <button class="inch-tab" onclick="setInchFilter(this,'13')">13"</button>
+      <button class="inch-tab" onclick="setInchFilter(this,'14')">14"</button>
+      <button class="inch-tab" onclick="setInchFilter(this,'15')">15"</button>
+      <button class="inch-tab" onclick="setInchFilter(this,'16')">16"</button>
+      <button class="inch-tab" onclick="setInchFilter(this,'17')">17"</button>
+      <button class="inch-tab" onclick="setInchFilter(this,'18')">18"</button>
+      <button class="inch-tab" onclick="setInchFilter(this,'19')">19"</button>
+      <button class="inch-tab" onclick="setInchFilter(this,'20+')">20"+</button>
+    </div>
+    <div id="stock-list"><div class="loading"><div class="spinner"></div> Chargement...</div></div>
+  </div>
+
+  <!-- GARDIENNAGE -->
+  <div class="tab-panel" id="panel-gardiennage">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-num" id="g-stat-total">—</div><div class="stat-label">Dépôts actifs</div></div>
+      <div class="stat-card"><div class="stat-num" id="g-stat-rdc">—</div><div class="stat-label">RDC</div></div>
+      <div class="stat-card"><div class="stat-num" id="g-stat-etage">—</div><div class="stat-label">Étage</div></div>
+      <div class="stat-card"><div class="stat-num" id="g-stat-late">—</div><div class="stat-label">En retard</div></div>
+    </div>
+    <div class="toolbar">
+      <input type="text" class="search-input" id="gard-search" placeholder="🔍 Nom ou prénom..." oninput="renderGardiennage()" />
+      <button class="btn btn-primary" onclick="openGardModal()">+ Nouveau dépôt</button>
+    </div>
+    <div class="table-wrap" id="gard-table-wrap"><div class="loading"><div class="spinner"></div> Chargement...</div></div>
+  </div>
+
+</div>
+
+<!-- MODAL STOCK -->
+<div class="modal-overlay hidden" id="modal-stock">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="stock-modal-title">Nouvelle référence</div>
+    <input type="hidden" id="stock-edit-id" />
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Taille *</label><input class="form-control" id="s-taille" placeholder="205/55 R16" /></div>
+      <div class="form-group"><label class="form-label">Marque *</label><input class="form-control" id="s-marque" placeholder="Michelin" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">État *</label><select class="form-control" id="s-etat"><option value="neuf">Neuf</option><option value="occasion">Occasion</option></select></div>
+      <div class="form-group"><label class="form-label">Quantité *</label><input class="form-control" id="s-quantite" type="number" min="0" value="1" inputmode="numeric" /></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-stock')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveStock()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GARDIENNAGE -->
+<div class="modal-overlay hidden" id="modal-gard">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="gard-modal-title">Nouveau dépôt</div>
+    <input type="hidden" id="gard-edit-id" />
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Nom *</label><input class="form-control" id="g-nom" placeholder="Dupont" autocapitalize="words" /></div>
+      <div class="form-group"><label class="form-label">Prénom *</label><input class="form-control" id="g-prenom" placeholder="Jean" autocapitalize="words" /></div>
+    </div>
+    <div class="form-group"><label class="form-label">Téléphone</label><input class="form-control" id="g-telephone" placeholder="06 12 34 56 78" type="tel" /></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Taille pneus *</label><input class="form-control" id="g-taille" placeholder="205/55 R16" /></div>
+      <div class="form-group"><label class="form-label">Marque</label><input class="form-control" id="g-marque" placeholder="Michelin" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Quantité</label><input class="form-control" id="g-quantite" type="number" min="1" value="4" inputmode="numeric" /></div>
+      <div class="form-group"><label class="form-label">Emplacement *</label><select class="form-control" id="g-emplacement"><option value="RDC">RDC</option><option value="Étage">Étage</option></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Date de dépôt *</label><input class="form-control" id="g-date-depot" type="date" /></div>
+      <div class="form-group"><label class="form-label">Date de reprise</label><input class="form-control" id="g-date-reprise" type="date" /></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-gard')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveGard()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ══ CONFIG SUPABASE ══
+const SUPABASE_URL = 'https://kcdeiseqelatwperhfrs.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjZGVpc2VxZWxhdHdwZXJoZnJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMjE3NzksImV4cCI6MjA5MjU5Nzc3OX0.U6kfXnDmLpxDX4-xsAyxI0Y0XShu-ExUVo-cL589FOE';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let stockData = [], gardData = [], activeInch = 'tous';
+
+// ══ AUTH ══
+async function initAuth() {
+  const { data: { session } } = await db.auth.getSession();
+  session ? showApp() : showLogin();
+  db.auth.onAuthStateChange((_, s) => s ? showApp() : showLogin());
+}
+
+function showLogin() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('app-screen').classList.remove('visible');
+}
+
+function showApp() {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-screen').classList.add('visible');
+  loadAll();
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pwd = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  document.getElementById('login-error').style.display = 'none';
+  if (!email || !pwd) { showErr('Veuillez remplir email et mot de passe.'); return; }
+  btn.disabled = true; btn.textContent = 'Connexion...';
+  const { error } = await db.auth.signInWithPassword({ email, password: pwd });
+  btn.disabled = false; btn.textContent = 'Se connecter';
+  if (error) showErr('Email ou mot de passe incorrect.');
+}
+
+function showErr(msg) {
+  const e = document.getElementById('login-error');
+  e.textContent = msg; e.style.display = 'block';
+}
+
+async function doLogout() { await db.auth.signOut(); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (!document.getElementById('login-screen').classList.contains('hidden')) doLogin();
+    if (!document.getElementById('modal-stock').classList.contains('hidden')) saveStock();
+    if (!document.getElementById('modal-gard').classList.contains('hidden')) saveGard();
+  }
+  if (e.key === 'Escape') { closeModal('modal-stock'); closeModal('modal-gard'); }
+});
+
+// ══ INIT ══
+async function loadAll() {
+  try { await Promise.all([loadStock(), loadGardiennage()]); setStatus(true); }
+  catch(e) { setStatus(false); console.error(e); }
+}
+
+function setStatus(ok) {
+  document.getElementById('status-dot').style.background = ok ? '#4caf50' : '#f44336';
+  document.getElementById('status-text').textContent = ok ? 'Connecté' : 'Hors ligne';
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.main-tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.main-tab-btn[onclick="switchTab('${tab}')"]`).classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+
+// ══ FILTRE POUCES ══
+function setInchFilter(el, inch) {
+  activeInch = inch;
+  document.querySelectorAll('.inch-tab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderStock();
+}
+
+function getInch(taille) {
+  if (!taille) return null;
+  const m = taille.match(/R\s*(\d+)/i);
+  return m ? parseInt(m[1]) : null;
+}
+
+// ══ STOCK ══
+async function loadStock() {
+  const { data, error } = await db.from('stock_pneus').select('*').order('taille');
+  if (error) throw error;
+  stockData = data || [];
+  renderStock();
+}
+
+function renderStock() {
+  const q = document.getElementById('stock-search').value.trim().toLowerCase();
+  let filtered = stockData;
+  if (q) filtered = filtered.filter(r => r.taille?.toLowerCase().includes(q) || r.marque?.toLowerCase().includes(q));
+  if (activeInch !== 'tous') filtered = filtered.filter(r => {
+    const i = getInch(r.taille);
+    if (i === null) return false;
+    return activeInch === '20+' ? i >= 20 : i === parseInt(activeInch);
+  });
+
+  document.getElementById('s-stat-refs').textContent = stockData.length;
+  document.getElementById('s-stat-total').textContent = stockData.reduce((s,r)=>s+(r.quantite||0),0);
+  document.getElementById('s-stat-neuf').textContent = stockData.filter(r=>r.etat==='neuf').reduce((s,r)=>s+(r.quantite||0),0);
+  document.getElementById('s-stat-occ').textContent = stockData.filter(r=>r.etat==='occasion').reduce((s,r)=>s+(r.quantite||0),0);
+
+  const list = document.getElementById('stock-list');
+  if (!filtered.length) { list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Aucun pneu trouvé</div></div>`; return; }
+
+  list.innerHTML = `<div class="stock-cards">${filtered.map(r => {
+    const data64 = encodeURIComponent(JSON.stringify(r));
+    return `<div class="stock-card">
+      <div class="stock-card-info">
+        <div class="stock-card-taille">${r.taille||'—'}</div>
+        <div class="stock-card-meta">
+          <span>${r.marque||'—'}</span>
+          <span class="badge ${r.etat==='neuf'?'badge-neuf':'badge-occ'}">${r.etat||'—'}</span>
+        </div>
+      </div>
+      <div class="stock-card-right">
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="adjustStock('${r.id}',-1)">−</button>
+          <span class="qty-num ${(r.quantite||0)===0?'zero':''}">${r.quantite??0}</span>
+          <button class="qty-btn" onclick="adjustStock('${r.id}',1)">+</button>
+        </div>
+        <div class="stock-actions">
+          <button class="btn btn-secondary btn-sm" onclick="editStockById('${r.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteStock('${r.id}')">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+async function adjustStock(id, delta) {
+  const item = stockData.find(r => r.id == id);
+  if (!item) return;
+  const newQty = Math.max(0, (item.quantite||0)+delta);
+  const { error } = await db.from('stock_pneus').update({ quantite: newQty }).eq('id', id);
+  if (error) { toast('Erreur : '+error.message,'error'); return; }
+  item.quantite = newQty;
+  renderStock();
+  toast(delta > 0 ? '✅ +1 ajouté' : '✅ -1 retiré','success');
+}
+
+function openStockModal() {
+  document.getElementById('stock-edit-id').value = '';
+  document.getElementById('stock-modal-title').textContent = 'Nouvelle référence';
+  document.getElementById('s-taille').value = '';
+  document.getElementById('s-marque').value = '';
+  document.getElementById('s-etat').value = 'neuf';
+  document.getElementById('s-quantite').value = '1';
+  showModal('modal-stock');
+  setTimeout(()=>document.getElementById('s-taille').focus(),300);
+}
+
+function editStockById(id) {
+  const r = stockData.find(x => x.id == id);
+  if (!r) return;
+  document.getElementById('stock-edit-id').value = r.id;
+  document.getElementById('stock-modal-title').textContent = 'Modifier la référence';
+  document.getElementById('s-taille').value = r.taille||'';
+  document.getElementById('s-marque').value = r.marque||'';
+  document.getElementById('s-etat').value = r.etat||'neuf';
+  document.getElementById('s-quantite').value = r.quantite??0;
+  showModal('modal-stock');
+}
+
+async function saveStock() {
+  const id = document.getElementById('stock-edit-id').value;
+  const taille = document.getElementById('s-taille').value.trim().toUpperCase();
+  const marque = document.getElementById('s-marque').value.trim();
+  const etat = document.getElementById('s-etat').value;
+  const quantite = parseInt(document.getElementById('s-quantite').value)||0;
+  if (!taille||!marque) { toast('Remplir taille et marque','error'); return; }
+  if (id) {
+    const { error } = await db.from('stock_pneus').update({taille,marque,etat,quantite}).eq('id',id);
+    if (error) { toast('Erreur : '+error.message,'error'); return; }
+    toast('✅ Mis à jour','success');
+  } else {
+    const { error } = await db.from('stock_pneus').insert([{taille,marque,etat,quantite}]);
+    if (error) { toast('Erreur : '+error.message,'error'); return; }
+    toast('✅ Ajouté','success');
+  }
+  closeModal('modal-stock');
+  await loadStock();
+}
+
+async function deleteStock(id) {
+  if (!confirm('Supprimer cette référence ?')) return;
+  const { error } = await db.from('stock_pneus').delete().eq('id',id);
+  if (error) { toast('Erreur : '+error.message,'error'); return; }
+  toast('✅ Supprimé','success');
+  await loadStock();
+}
+
+// ══ GARDIENNAGE ══
+async function loadGardiennage() {
+  const { data, error } = await db.from('gardiennage').select('*').order('nom');
+  if (error) throw error;
+  gardData = data||[];
+  renderGardiennage();
+}
+
+function renderGardiennage() {
+  const q = document.getElementById('gard-search').value.trim().toLowerCase();
+  const filtered = q ? gardData.filter(r=>r.nom?.toLowerCase().includes(q)||r.prenom?.toLowerCase().includes(q)||r.telephone?.toLowerCase().includes(q)) : gardData;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const in7 = new Date(today); in7.setDate(in7.getDate()+7);
+
+  document.getElementById('g-stat-total').textContent = gardData.length;
+  document.getElementById('g-stat-rdc').textContent = gardData.filter(r=>r.emplacement==='RDC').length;
+  document.getElementById('g-stat-etage').textContent = gardData.filter(r=>r.emplacement==='Étage').length;
+  document.getElementById('g-stat-late').textContent = gardData.filter(r=>r.date_de_reprise&&new Date(r.date_de_reprise)<today).length;
+
+  const wrap = document.getElementById('gard-table-wrap');
+  if (!filtered.length) { wrap.innerHTML=`<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">Aucun dépôt trouvé</div></div>`; return; }
+
+  wrap.innerHTML = `<table><thead><tr>
+    <th>Client</th><th>Téléphone</th><th>Pneus</th><th>Emplacement</th><th>Dépôt</th><th>Reprise</th><th>Actions</th>
+  </tr></thead><tbody>${filtered.map(r => {
+    let cls='', label = r.date_de_reprise ? formatDate(r.date_de_reprise) : '—';
+    if (r.date_de_reprise) { const d=new Date(r.date_de_reprise); cls=d<today?'date-past':d<=in7?'date-soon':''; }
+    return `<tr>
+      <td><strong>${r.nom||''} ${r.prenom||''}</strong></td>
+      <td>${r.telephone||'—'}</td>
+      <td>${r.taille||'—'}${r.marque?' · '+r.marque:''}<br><small style="color:#999">${r.quantite||4} pneus</small></td>
+      <td><span class="badge ${r.emplacement==='RDC'?'badge-rdc':'badge-etage'}">${r.emplacement||'—'}</span></td>
+      <td>${r.date_depot?formatDate(r.date_depot):'—'}</td>
+      <td class="${cls}">${label}</td>
+      <td><div class="actions-cell">
+        <button class="btn btn-secondary btn-sm" onclick="editGardById('${r.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteGard('${r.id}')">🗑️</button>
+      </div></td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+function openGardModal() {
+  document.getElementById('gard-edit-id').value='';
+  document.getElementById('gard-modal-title').textContent='Nouveau dépôt';
+  ['g-nom','g-prenom','g-telephone','g-taille','g-marque'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('g-quantite').value='4';
+  document.getElementById('g-emplacement').value='RDC';
+  document.getElementById('g-date-depot').value=new Date().toISOString().split('T')[0];
+  document.getElementById('g-date-reprise').value='';
+  showModal('modal-gard');
+  setTimeout(()=>document.getElementById('g-nom').focus(),300);
+}
+
+function editGardById(id) {
+  const r = gardData.find(x=>x.id==id);
+  if (!r) return;
+  document.getElementById('gard-edit-id').value=r.id;
+  document.getElementById('gard-modal-title').textContent='Modifier le dépôt';
+  document.getElementById('g-nom').value=r.nom||'';
+  document.getElementById('g-prenom').value=r.prenom||'';
+  document.getElementById('g-telephone').value=r.telephone||'';
+  document.getElementById('g-taille').value=r.taille||'';
+  document.getElementById('g-marque').value=r.marque||'';
+  document.getElementById('g-quantite').value=r.quantite||4;
+  document.getElementById('g-emplacement').value=r.emplacement||'RDC';
+  document.getElementById('g-date-depot').value=r.date_depot||'';
+  document.getElementById('g-date-reprise').value=r.date_de_reprise||'';
+  showModal('modal-gard');
+}
+
+async function saveGard() {
+  const id = document.getElementById('gard-edit-id').value;
+  const payload = {
+    nom: document.getElementById('g-nom').value.trim(),
+    prenom: document.getElementById('g-prenom').value.trim(),
+    telephone: document.getElementById('g-telephone').value.trim(),
+    taille: document.getElementById('g-taille').value.trim().toUpperCase(),
+    marque: document.getElementById('g-marque').value.trim(),
+    quantite: parseInt(document.getElementById('g-quantite').value)||4,
+    emplacement: document.getElementById('g-emplacement').value,
+    date_depot: document.getElementById('g-date-depot').value||null,
+    date_de_reprise: document.getElementById('g-date-reprise').value||null,
+  };
+  if (!payload.nom||!payload.prenom||!payload.taille) { toast('Remplir Nom, Prénom et Taille','error'); return; }
+  if (id) {
+    const { error } = await db.from('gardiennage').update(payload).eq('id',id);
+    if (error) { toast('Erreur : '+error.message,'error'); return; }
+    toast('✅ Dépôt mis à jour','success');
+  } else {
+    const { error } = await db.from('gardiennage').insert([payload]);
+    if (error) { toast('Erreur : '+error.message,'error'); return; }
+    toast('✅ Dépôt enregistré','success');
+  }
+  closeModal('modal-gard');
+  await loadGardiennage();
+}
+
+async function deleteGard(id) {
+  if (!confirm('Supprimer ce dépôt ?')) return;
+  const { error } = await db.from('gardiennage').delete().eq('id',id);
+  if (error) { toast('Erreur : '+error.message,'error'); return; }
+  toast('✅ Supprimé','success');
+  await loadGardiennage();
+}
+
+// ══ UTILITAIRES ══
+function showModal(id) { document.getElementById(id).classList.remove('hidden'); document.body.style.overflow='hidden'; }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); document.body.style.overflow=''; }
+
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if(e.target===el){ el.classList.add('hidden'); document.body.style.overflow=''; } });
+});
+
+function formatDate(d) { if(!d)return'—'; const[y,m,j]=d.split('-'); return`${j}/${m}/${y}`; }
+
+function toast(msg, type='') {
+  const t = document.createElement('div');
+  t.className=`toast ${type}`; t.textContent=msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+
+// ══ TEMPS RÉEL ══
+db.channel('rt-stock').on('postgres_changes',{event:'*',schema:'public',table:'stock_pneus'},()=>loadStock()).subscribe();
+db.channel('rt-gard').on('postgres_changes',{event:'*',schema:'public',table:'gardiennage'},()=>loadGardiennage()).subscribe();
+
+// ══ START ══
+initAuth();
+</script>
+</body>
+</html>
