@@ -94,6 +94,29 @@
     .stock-card-meta { font-size:13px; color:var(--gray-mid); margin-top:3px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
     .stock-card-right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
 
+    /* ── Photo thumbnail ── */
+    .thumb { width:48px; height:48px; border-radius:8px; object-fit:cover; border:var(--border); cursor:pointer; flex-shrink:0; transition:transform .15s; }
+    .thumb:hover { transform:scale(1.08); }
+    .thumb-placeholder { width:48px; height:48px; border-radius:8px; border:1.5px dashed #ddd; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; color:#ccc; }
+
+    /* ── Photo upload zone ── */
+    .photo-upload-zone { border:2px dashed #ddd; border-radius:10px; padding:16px; text-align:center; cursor:pointer; transition:all .2s; background:#fafafa; margin-top:4px; }
+    .photo-upload-zone:hover, .photo-upload-zone.drag-over { border-color:var(--red); background:var(--red-light); }
+    .photo-upload-zone input[type=file] { display:none; }
+    .photo-upload-zone .upload-label { font-size:13px; color:var(--gray-mid); cursor:pointer; }
+    .photo-upload-zone .upload-icon { font-size:28px; margin-bottom:6px; }
+    .photo-preview-wrap { position:relative; display:inline-block; }
+    .photo-preview { max-width:100%; max-height:160px; border-radius:8px; object-fit:cover; margin-top:8px; display:block; border:var(--border); }
+    .photo-remove-btn { position:absolute; top:12px; right:4px; background:var(--red); color:white; border:none; border-radius:50%; width:24px; height:24px; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; }
+
+    /* ── Lightbox ── */
+    .lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:2000; display:flex; align-items:center; justify-content:center; cursor:pointer; animation:fadeIn .2s ease; }
+    .lightbox.hidden { display:none; }
+    @keyframes fadeIn { from{opacity:0}to{opacity:1} }
+    .lightbox img { max-width:92vw; max-height:88vh; border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,.6); object-fit:contain; }
+    .lightbox-close { position:absolute; top:16px; right:20px; color:white; font-size:32px; cursor:pointer; line-height:1; opacity:.7; transition:opacity .15s; }
+    .lightbox-close:hover { opacity:1; }
+
     /* ── Qty control ── */
     .qty-ctrl { display:flex; align-items:center; gap:5px; }
     .qty-btn { width:38px; height:38px; border-radius:8px; border:var(--border); background:var(--white); cursor:pointer; font-size:20px; font-weight:700; display:flex; align-items:center; justify-content:center; transition:all .15s; color:var(--black); touch-action:manipulation; line-height:1; user-select:none; }
@@ -256,9 +279,23 @@
       <div class="form-group"><label class="form-label">État *</label><select class="form-control" id="s-etat"><option value="neuf">Neuf</option><option value="occasion">Occasion</option></select></div>
       <div class="form-group"><label class="form-label">Quantité *</label><input class="form-control" id="s-quantite" type="number" min="0" value="1" inputmode="numeric" /></div>
     </div>
+    <!-- PHOTO STOCK -->
+    <div class="form-group">
+      <label class="form-label">📸 Photo emplacement</label>
+      <div class="photo-upload-zone" id="s-photo-zone" onclick="document.getElementById('s-photo-input').click()" ondragover="handleDragOver(event,'s-photo-zone')" ondragleave="handleDragLeave('s-photo-zone')" ondrop="handleDrop(event,'s-photo-input','s-photo-zone','s-photo-preview-wrap','s-photo-preview')">
+        <input type="file" id="s-photo-input" accept="image/*" onchange="handlePhotoChange(this,'s-photo-preview-wrap','s-photo-preview')" />
+        <div class="upload-icon">📷</div>
+        <div class="upload-label">Cliquez ou glissez une photo ici<br><small style="color:#bbb">JPG, PNG – max 5 Mo</small></div>
+      </div>
+      <div class="photo-preview-wrap hidden" id="s-photo-preview-wrap">
+        <img class="photo-preview" id="s-photo-preview" src="" alt="Aperçu" />
+        <button class="photo-remove-btn" onclick="removePhoto('s-photo-input','s-photo-preview-wrap','s-photo-preview','s-photo-zone')" title="Supprimer la photo">✕</button>
+      </div>
+      <input type="hidden" id="s-photo-url" />
+    </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('modal-stock')">Annuler</button>
-      <button class="btn btn-primary" onclick="saveStock()">Enregistrer</button>
+      <button class="btn btn-primary" id="s-save-btn" onclick="saveStock()">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -286,11 +323,31 @@
       <div class="form-group"><label class="form-label">Date de dépôt *</label><input class="form-control" id="g-date-depot" type="date" /></div>
       <div class="form-group"><label class="form-label">Date de reprise</label><input class="form-control" id="g-date-reprise" type="date" /></div>
     </div>
+    <!-- PHOTO GARDIENNAGE -->
+    <div class="form-group">
+      <label class="form-label">📸 Photo emplacement</label>
+      <div class="photo-upload-zone" id="g-photo-zone" onclick="document.getElementById('g-photo-input').click()" ondragover="handleDragOver(event,'g-photo-zone')" ondragleave="handleDragLeave('g-photo-zone')" ondrop="handleDrop(event,'g-photo-input','g-photo-zone','g-photo-preview-wrap','g-photo-preview')">
+        <input type="file" id="g-photo-input" accept="image/*" onchange="handlePhotoChange(this,'g-photo-preview-wrap','g-photo-preview')" />
+        <div class="upload-icon">📷</div>
+        <div class="upload-label">Cliquez ou glissez une photo ici<br><small style="color:#bbb">JPG, PNG – max 5 Mo</small></div>
+      </div>
+      <div class="photo-preview-wrap hidden" id="g-photo-preview-wrap">
+        <img class="photo-preview" id="g-photo-preview" src="" alt="Aperçu" />
+        <button class="photo-remove-btn" onclick="removePhoto('g-photo-input','g-photo-preview-wrap','g-photo-preview','g-photo-zone')" title="Supprimer la photo">✕</button>
+      </div>
+      <input type="hidden" id="g-photo-url" />
+    </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('modal-gard')">Annuler</button>
-      <button class="btn btn-primary" onclick="saveGard()">Enregistrer</button>
+      <button class="btn btn-primary" id="g-save-btn" onclick="saveGard()">Enregistrer</button>
     </div>
   </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox hidden" id="lightbox" onclick="closeLightbox()">
+  <span class="lightbox-close">✕</span>
+  <img id="lightbox-img" src="" alt="Photo emplacement" onclick="event.stopPropagation()" />
 </div>
 
 <div class="toast-container" id="toasts"></div>
@@ -301,6 +358,9 @@ const SUPABASE_URL = 'https://mcekmtajaenlqrzuihzq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jZWttdGFqYWVubHFyenVpaHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxOTIwOTEsImV4cCI6MjA5Mjc2ODA5MX0.qmhfSFoiYOuhcMSe8sTxyjBpNze1wr-NxmnPdGQIOZU';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Nom du bucket Supabase Storage (à créer dans votre dashboard)
+const STORAGE_BUCKET = 'photos-pneus';
 
 let stockData = [], gardData = [], activeInch = 'tous';
 
@@ -342,12 +402,10 @@ function showErr(msg) {
 async function doLogout() { await db.auth.signOut(); }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    if (!document.getElementById('login-screen').classList.contains('hidden')) doLogin();
-    if (!document.getElementById('modal-stock').classList.contains('hidden')) saveStock();
-    if (!document.getElementById('modal-gard').classList.contains('hidden')) saveGard();
+  if (e.key === 'Escape') {
+    closeModal('modal-stock'); closeModal('modal-gard');
+    closeLightbox();
   }
-  if (e.key === 'Escape') { closeModal('modal-stock'); closeModal('modal-gard'); }
 });
 
 // ══ INIT ══
@@ -382,6 +440,91 @@ function getInch(taille) {
   return m ? parseInt(m[1]) : null;
 }
 
+// ══ PHOTO HELPERS ══
+function handlePhotoChange(input, previewWrapId, previewId) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('Photo trop lourde (max 5 Mo)', 'error'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById(previewId).src = e.target.result;
+    document.getElementById(previewWrapId).classList.remove('hidden');
+    // hide the upload zone text
+    document.getElementById(previewWrapId).previousElementSibling.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePhoto(inputId, previewWrapId, previewId, zoneId) {
+  document.getElementById(inputId).value = '';
+  document.getElementById(previewId).src = '';
+  document.getElementById(previewWrapId).classList.add('hidden');
+  document.getElementById(zoneId).style.display = '';
+  // also clear stored URL
+  const urlField = inputId.replace('-input', '-url');
+  if (document.getElementById(urlField)) document.getElementById(urlField).value = '';
+}
+
+function handleDragOver(e, zoneId) {
+  e.preventDefault();
+  document.getElementById(zoneId).classList.add('drag-over');
+}
+function handleDragLeave(zoneId) {
+  document.getElementById(zoneId).classList.remove('drag-over');
+}
+function handleDrop(e, inputId, zoneId, previewWrapId, previewId) {
+  e.preventDefault();
+  document.getElementById(zoneId).classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  document.getElementById(inputId).files = dt.files;
+  handlePhotoChange(document.getElementById(inputId), previewWrapId, previewId);
+}
+
+async function uploadPhoto(inputId, folder) {
+  const input = document.getElementById(inputId);
+  if (!input.files || !input.files[0]) return null;
+  const file = input.files[0];
+  const ext = file.name.split('.').pop();
+  const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const { data, error } = await db.storage.from(STORAGE_BUCKET).upload(path, file, { upsert: false });
+  if (error) { toast('Erreur upload photo : ' + error.message, 'error'); return null; }
+  const { data: urlData } = db.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+  return urlData.publicUrl;
+}
+
+async function deletePhotoByUrl(url) {
+  if (!url) return;
+  try {
+    // Extract path from public URL
+    const path = url.split(`/storage/v1/object/public/${STORAGE_BUCKET}/`)[1];
+    if (path) await db.storage.from(STORAGE_BUCKET).remove([path]);
+  } catch(e) { console.warn('Could not delete old photo:', e); }
+}
+
+function setExistingPhoto(url, previewWrapId, previewId, zoneId) {
+  if (url) {
+    document.getElementById(previewId).src = url;
+    document.getElementById(previewWrapId).classList.remove('hidden');
+    document.getElementById(zoneId).style.display = 'none';
+  } else {
+    document.getElementById(previewWrapId).classList.add('hidden');
+    document.getElementById(zoneId).style.display = '';
+  }
+}
+
+// ══ LIGHTBOX ══
+function openLightbox(url) {
+  document.getElementById('lightbox-img').src = url;
+  document.getElementById('lightbox').classList.remove('hidden');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.add('hidden');
+  document.getElementById('lightbox-img').src = '';
+}
+
 // ══ STOCK ══
 async function loadStock() {
   const { data, error } = await db.from('stock_pneus').select('*').order('taille');
@@ -409,8 +552,11 @@ function renderStock() {
   if (!filtered.length) { list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Aucun pneu trouvé</div></div>`; return; }
 
   list.innerHTML = `<div class="stock-cards">${filtered.map(r => {
-    const data64 = encodeURIComponent(JSON.stringify(r));
+    const thumbHtml = r.photo_url
+      ? `<img class="thumb" src="${r.photo_url}" alt="photo" onclick="openLightbox('${r.photo_url}')" />`
+      : `<div class="thumb-placeholder" title="Pas de photo">📷</div>`;
     return `<div class="stock-card">
+      ${thumbHtml}
       <div class="stock-card-info">
         <div class="stock-card-taille">${r.taille||'—'}</div>
         <div class="stock-card-meta">
@@ -451,6 +597,9 @@ function openStockModal() {
   document.getElementById('s-marque').value = '';
   document.getElementById('s-etat').value = 'neuf';
   document.getElementById('s-quantite').value = '1';
+  document.getElementById('s-photo-input').value = '';
+  document.getElementById('s-photo-url').value = '';
+  setExistingPhoto(null, 's-photo-preview-wrap', 's-photo-preview', 's-photo-zone');
   showModal('modal-stock');
   setTimeout(()=>document.getElementById('s-taille').focus(),300);
 }
@@ -464,6 +613,9 @@ function editStockById(id) {
   document.getElementById('s-marque').value = r.marque||'';
   document.getElementById('s-etat').value = r.etat||'neuf';
   document.getElementById('s-quantite').value = r.quantite??0;
+  document.getElementById('s-photo-input').value = '';
+  document.getElementById('s-photo-url').value = r.photo_url||'';
+  setExistingPhoto(r.photo_url||null, 's-photo-preview-wrap', 's-photo-preview', 's-photo-zone');
   showModal('modal-stock');
 }
 
@@ -474,21 +626,44 @@ async function saveStock() {
   const etat = document.getElementById('s-etat').value;
   const quantite = parseInt(document.getElementById('s-quantite').value)||0;
   if (!taille||!marque) { toast('Remplir taille et marque','error'); return; }
+
+  const saveBtn = document.getElementById('s-save-btn');
+  saveBtn.disabled = true; saveBtn.textContent = 'Enregistrement...';
+
+  // Photo upload
+  let photo_url = document.getElementById('s-photo-url').value || null;
+  const newFile = document.getElementById('s-photo-input').files[0];
+  if (newFile) {
+    // Delete old photo if editing
+    if (id && photo_url) await deletePhotoByUrl(photo_url);
+    photo_url = await uploadPhoto('s-photo-input', 'stock');
+  }
+  // If preview was removed and no new file, clear URL
+  if (!newFile && document.getElementById('s-photo-preview-wrap').classList.contains('hidden')) {
+    photo_url = null;
+  }
+
+  const payload = { taille, marque, etat, quantite, photo_url };
+
   if (id) {
-    const { error } = await db.from('stock_pneus').update({taille,marque,etat,quantite}).eq('id',id);
-    if (error) { toast('Erreur : '+error.message,'error'); return; }
+    const { error } = await db.from('stock_pneus').update(payload).eq('id',id);
+    if (error) { toast('Erreur : '+error.message,'error'); saveBtn.disabled=false; saveBtn.textContent='Enregistrer'; return; }
     toast('✅ Mis à jour','success');
   } else {
-    const { error } = await db.from('stock_pneus').insert([{taille,marque,etat,quantite}]);
-    if (error) { toast('Erreur : '+error.message,'error'); return; }
+    const { error } = await db.from('stock_pneus').insert([payload]);
+    if (error) { toast('Erreur : '+error.message,'error'); saveBtn.disabled=false; saveBtn.textContent='Enregistrer'; return; }
     toast('✅ Ajouté','success');
   }
+  saveBtn.disabled=false; saveBtn.textContent='Enregistrer';
   closeModal('modal-stock');
   await loadStock();
 }
 
 async function deleteStock(id) {
   if (!confirm('Supprimer cette référence ?')) return;
+  // Delete photo from storage too
+  const item = stockData.find(r => r.id == id);
+  if (item?.photo_url) await deletePhotoByUrl(item.photo_url);
   const { error } = await db.from('stock_pneus').delete().eq('id',id);
   if (error) { toast('Erreur : '+error.message,'error'); return; }
   toast('✅ Supprimé','success');
@@ -518,11 +693,15 @@ function renderGardiennage() {
   if (!filtered.length) { wrap.innerHTML=`<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">Aucun dépôt trouvé</div></div>`; return; }
 
   wrap.innerHTML = `<table><thead><tr>
-    <th>Client</th><th>Téléphone</th><th>Pneus</th><th>Emplacement</th><th>Dépôt</th><th>Reprise</th><th>Actions</th>
+    <th>Photo</th><th>Client</th><th>Téléphone</th><th>Pneus</th><th>Emplacement</th><th>Dépôt</th><th>Reprise</th><th>Actions</th>
   </tr></thead><tbody>${filtered.map(r => {
     let cls='', label = r.date_de_reprise ? formatDate(r.date_de_reprise) : '—';
     if (r.date_de_reprise) { const d=new Date(r.date_de_reprise); cls=d<today?'date-past':d<=in7?'date-soon':''; }
+    const thumbHtml = r.photo_url
+      ? `<img class="thumb" src="${r.photo_url}" alt="photo" onclick="openLightbox('${r.photo_url}')" />`
+      : `<div class="thumb-placeholder" title="Pas de photo">📷</div>`;
     return `<tr>
+      <td>${thumbHtml}</td>
       <td><strong>${r.nom||''} ${r.prenom||''}</strong></td>
       <td>${r.telephone||'—'}</td>
       <td>${r.taille||'—'}${r.marque?' · '+r.marque:''}<br><small style="color:#999">${r.quantite||4} pneus</small></td>
@@ -545,6 +724,9 @@ function openGardModal() {
   document.getElementById('g-emplacement').value='RDC';
   document.getElementById('g-date-depot').value=new Date().toISOString().split('T')[0];
   document.getElementById('g-date-reprise').value='';
+  document.getElementById('g-photo-input').value='';
+  document.getElementById('g-photo-url').value='';
+  setExistingPhoto(null, 'g-photo-preview-wrap', 'g-photo-preview', 'g-photo-zone');
   showModal('modal-gard');
   setTimeout(()=>document.getElementById('g-nom').focus(),300);
 }
@@ -563,38 +745,63 @@ function editGardById(id) {
   document.getElementById('g-emplacement').value=r.emplacement||'RDC';
   document.getElementById('g-date-depot').value=r.date_depot||'';
   document.getElementById('g-date-reprise').value=r.date_de_reprise||'';
+  document.getElementById('g-photo-input').value='';
+  document.getElementById('g-photo-url').value=r.photo_url||'';
+  setExistingPhoto(r.photo_url||null, 'g-photo-preview-wrap', 'g-photo-preview', 'g-photo-zone');
   showModal('modal-gard');
 }
 
 async function saveGard() {
   const id = document.getElementById('gard-edit-id').value;
+  const nom = document.getElementById('g-nom').value.trim();
+  const prenom = document.getElementById('g-prenom').value.trim();
+  const taille = document.getElementById('g-taille').value.trim().toUpperCase();
+  if (!nom||!prenom||!taille) { toast('Remplir Nom, Prénom et Taille','error'); return; }
+
+  const saveBtn = document.getElementById('g-save-btn');
+  saveBtn.disabled = true; saveBtn.textContent = 'Enregistrement...';
+
+  // Photo upload
+  let photo_url = document.getElementById('g-photo-url').value || null;
+  const newFile = document.getElementById('g-photo-input').files[0];
+  if (newFile) {
+    if (id && photo_url) await deletePhotoByUrl(photo_url);
+    photo_url = await uploadPhoto('g-photo-input', 'gardiennage');
+  }
+  if (!newFile && document.getElementById('g-photo-preview-wrap').classList.contains('hidden')) {
+    photo_url = null;
+  }
+
   const payload = {
-    nom: document.getElementById('g-nom').value.trim(),
-    prenom: document.getElementById('g-prenom').value.trim(),
+    nom, prenom,
     telephone: document.getElementById('g-telephone').value.trim(),
-    taille: document.getElementById('g-taille').value.trim().toUpperCase(),
+    taille,
     marque: document.getElementById('g-marque').value.trim(),
     quantite: parseInt(document.getElementById('g-quantite').value)||4,
     emplacement: document.getElementById('g-emplacement').value,
     date_depot: document.getElementById('g-date-depot').value||null,
     date_de_reprise: document.getElementById('g-date-reprise').value||null,
+    photo_url,
   };
-  if (!payload.nom||!payload.prenom||!payload.taille) { toast('Remplir Nom, Prénom et Taille','error'); return; }
+
   if (id) {
     const { error } = await db.from('gardiennage').update(payload).eq('id',id);
-    if (error) { toast('Erreur : '+error.message,'error'); return; }
+    if (error) { toast('Erreur : '+error.message,'error'); saveBtn.disabled=false; saveBtn.textContent='Enregistrer'; return; }
     toast('✅ Dépôt mis à jour','success');
   } else {
     const { error } = await db.from('gardiennage').insert([payload]);
-    if (error) { toast('Erreur : '+error.message,'error'); return; }
+    if (error) { toast('Erreur : '+error.message,'error'); saveBtn.disabled=false; saveBtn.textContent='Enregistrer'; return; }
     toast('✅ Dépôt enregistré','success');
   }
+  saveBtn.disabled=false; saveBtn.textContent='Enregistrer';
   closeModal('modal-gard');
   await loadGardiennage();
 }
 
 async function deleteGard(id) {
   if (!confirm('Supprimer ce dépôt ?')) return;
+  const item = gardData.find(r => r.id == id);
+  if (item?.photo_url) await deletePhotoByUrl(item.photo_url);
   const { error } = await db.from('gardiennage').delete().eq('id',id);
   if (error) { toast('Erreur : '+error.message,'error'); return; }
   toast('✅ Supprimé','success');
